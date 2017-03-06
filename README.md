@@ -4,6 +4,8 @@ the NES emulator communication script is written by Marques Edel (irc nick: zoq)
 
 the CMA-ES code for Mario is written by me inspired by the existing NEAT implementation on zoq repo.
 
+<p align="center"><img src="http://image.diku.dk/igel/images/CMA_cartoon.gif" alt="working of CMA-ES algorithm" width="400"/></p>
+
 This repository contains a collection of scripts for running and communicating with various NES games over a C++ interface. It aims to give the machine learning community a streamlined tool to get information and controls about the game state of an NES game.
 
 The repository contains basicaly two modules. The communication module used to communicate with the emulator over a C++ interface and the emulator module, that runs the NES game and provides an interface to get various information about the game state.
