@@ -2,29 +2,29 @@
  * @file super_mario_bros.cpp
  * @author Marcus Edel
  *
- * Simple test programm to use the mlpack evolution methods.
+ * Using CMA_ES algorithm 
  */
-
-#include <mlpack/core.hpp>
-
 #include <iostream>
 #include <string>
+#include <stdlib.h>
+
+#include <mlpack/core.hpp> 
+#include "link_gene.hpp"
+#include "neuron_gene.hpp"
+#include "genome.hpp"
+#include "utils.hpp"
+
+
+#include "cmaes.h"
 
 #include "parser.hpp"
 #include "client.hpp"
 #include "messages.hpp"
 
-#include <mlpack/methods/ne/parameters.hpp>
-#include <mlpack/methods/ne/tasks.hpp>
-#include <mlpack/methods/ne/link_gene.hpp>
-#include <mlpack/methods/ne/neuron_gene.hpp>
-#include <mlpack/methods/ne/genome.hpp>
-#include <mlpack/methods/ne/species.hpp>
-#include <mlpack/methods/ne/cne.hpp>
-#include <mlpack/methods/ne/neat.hpp>
+
 
 using namespace mlpack;
-using namespace mlpack::ne;
+using namespace bang::ne;
 
 class TaskSuperMarioBros
 {
