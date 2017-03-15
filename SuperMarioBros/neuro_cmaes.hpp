@@ -1,9 +1,15 @@
-#pragma once
+#ifndef MLPACK_METHODS_NEURO_CMAES_NEURO_CMAES_HPP
+#define MLPACK_METHODS_NEURO_CMAES_NEURO_CMAES_HPP
 
-#include "parameters.h"
-#include "random.h"
-#include "timings.h"
-#include "utils.h"
+ /**
+ * @file neuro_cmaes.hpp
+ * @author www.github.com/Kartik-Nighania
+ *
+ * implementation of CMAES with feed forward neural networks
+ */
+
+#include <cstddef>
+#include <mlpack/core.hpp>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -15,80 +21,81 @@
 #include <stdexcept>
 #include <string>
 
-/**
- * @class CMAES
- * Evolution Strategies with Covariance Matrix Adaptation. The public interface
- * of the optimization algorithm.
- */
+#include "genome.hpp"
+#include "neuron_gene.hpp"
+#include "link_gene.hpp"
+#include "parameters.hpp"
+#include "random.hpp"
+#include "utils.hpp"
+
+
+namespace mlpack {
+namespace neuro_cmaes {
+
+template<typename T> class CMAES;
+
+
 template<typename T>
-class CMAES
-{
+class CMAES{
 public:
 
-  /**
-   * Keys for get().
-   */
-  enum GetScalar
-  {
-    NoScalar = 0,
-    AxisRatio = 1,
-    Eval = 2, Evaluations = 2,
-    FctValue = 3, FuncValue = 3, FunValue = 3, Fitness = 3,
-    FBestEver = 4,
-    Generation = 5, Iteration = 5,
-    MaxEval = 6, MaxFunEvals = 6, StopMaxFunEvals = 6,
-    MaxGen = 7, MaxIter = 7, StopMaxIter = 7,
-    MaxAxisLength = 8,
-    MinAxisLength = 9,
-    MaxStdDev = 10,
-    MinStdDev = 11,
-    Dim = 12, Dimension = 12,
-    Lambda = 13, SampleSize = 13, PopSize = 13,
-    Sigma = 14
-  };
+//USER FUNCTIONS TO GET PARAMETER IN VALUES AND ARRAYS
 
-  /**
-   * Keys for getPtr().
-   */
-  enum GetVector
-  {
-    NoVector = 0,
-    DiagC = 1,
-    DiagD = 2,
-    StdDev = 3,
-    XBestEver = 4,
-    XBest = 5,
-    XMean = 6
-  };
+T axisRatio()
+{
+ return maxElement(rgD, params.N) / minElement(rgD, params.N);
+};
 
-  /**
-   * Keys for writeToFile().
-   */
-  enum WriteKey
+T evaluation(){ return countevals; }
+
+T fitness(){ return functionValues[index[0]];}
+
+T fitnessBestEver(){ return xBestEver[params.N];}
+
+T generation(){ return gen;}
+
+T maxEvaluation(){ return params.stopMaxFunEvals;}
+
+T maxIteration(){ return std::ceil(params.stopMaxIter); }
+
+T maxAxisLength(){ return sigma*std::sqrt(maxEW);}
+
+T minAxisLength(){ return sigma*std::sqrt(minEW); }
+
+T maxStdDev(){return sigma*std::sqrt(maxdiagC);}
+
+T minStdDev(){return sigma*std::sqrt(mindiagC);}
+
+T dimension(){return params.N;}
+
+T sampleSize(){return params.lambda;}
+
+T sigmaValue(){return sigma;}
+
+  T* diagonalCovariance()
   {
-    WCNone = 0,
-    WKResume = 1,
-    WKXMean = 2,
-    WKC = 4,
-    WKAll = 8,
-    WKFewInfo = 16,
-    WKFew = 32,
-    WKEval = 64,
-    WKFitness = 128,
-    WKFBestEver = 256,
-    WKCGeneration = 512,
-    WKSigma = 1024,
-    WKLambda = 2048,
-    WKB = 4096,
-    WKXBest = 8192,
-    WKClock = 16384,
-    WKDim = 32768
-  };
+     for(int i = 0; i < params.N; ++i)
+          output[i] = C[i][i];
+        return output;
+  }
+
+  T* diagonalD(){ return rgD; }
+
+  T* standardDeviation()
+  {
+    for(int i = 0; i < params.N; ++i)
+          output[i] = sigma*std::sqrt(C[i][i]);
+        return output;
+  }
+
+ T* XBestEver(){ return xBestEver;}
+
+T* XBest(){return population[index[0]];}
+
+T* XMean(){return xmean;}
 
 private:
 
-  //! Implementation version.
-  std::string version;
   //!< Random number generator.
   Random<T> rand;
   //!< CMA-ES parameters.
@@ -150,26 +157,12 @@ private:
   T dMaxSignifKond;
   T dLastMinEWgroesserNull;
 
-  bool isResumeDone;
-
-  time_t printtime;
-  time_t writetime; //!< ideally should keep track for each output file
-  time_t firstwritetime;
-  time_t firstprinttime;
-
   std::string stopMessage; //!< A message that contains all matched stop criteria.
-
-  std::string getTimeStr(void)
-  {
-    time_t tm = time(0);
-    std::string timeStr(ctime(&tm));
-    return timeStr.substr(0, 24);
-  }
 
   /**
    * Calculating eigenvalues and vectors.
-   * @param rgtmp (input) N+1-dimensional vector for temporal use. 
-   * @param diag (output) N eigenvalues. 
+   * @param rgtmp (input) N+1-dimensional vector for temporal use.
+   * @param diag (output) N eigenvalues.
    * @param Q (output) Columns are normalized eigenvectors.
    */
   void eigen(T* diag, T** Q, T* rgtmp)
@@ -187,7 +180,7 @@ private:
     ql(diag, rgtmp, Q);
   }
 
-  /** 
+  /**
    * Exhaustive test of the output of the eigendecomposition, needs O(n^3)
    * operations writes to error file.
    * @return number of detected inaccuracies
@@ -230,15 +223,6 @@ private:
     return res;
   }
 
-  /**
-   * Symmetric tridiagonal QL algorithm, iterative.
-   * Computes the eigensystem from a tridiagonal matrix in roughtly 3N^3 operations
-   * code adapted from Java JAMA package, function tql2.
-   * @param d input: Diagonale of tridiagonal matrix. output: eigenvalues.
-   * @param e input: [1..n-1], off-diagonal, output from Householder
-   * @param V input: matrix output of Householder. output: basis of
-   *          eigenvectors, according to d
-   */
   void ql(T* d, T* e, T** V)
   {
     const int n = params.N;
@@ -331,14 +315,6 @@ private:
     }
   }
 
-  /**
-   * Householder transformation of a symmetric matrix V into tridiagonal form.
-   * Code slightly adapted from the Java JAMA package, function private tred2().
-   * @param V input: symmetric nxn-matrix. output: orthogonal transformation
-   *          matrix: tridiag matrix == V* V_in* V^t.
-   * @param d output: diagonal
-   * @param e output: [0..n-1], off diagonal (elements 1..n-1)
-   */
   void householder(T** V, T* d, T* e)
   {
     const int n = params.N;
@@ -564,176 +540,11 @@ private:
     }
   }
 
-  /**
-   * This hack reads key words from input key for data to be written to
-   * a file, see file signals.par as input file. The length of the keys
-   * is mostly fixed. If the key phrase does not match the expectation the
-   * output might be strange.
-   */
-  void writeToStream(int key, std::ostream& file)
-  {
-    if(key & WKResume)
-    {
-      file << std::endl << "# resume " << params.N << std::endl;
-      file << "xmean" << std::endl;
-      writeToStream(WKXMean, file);
-      file << "path for sigma" << std::endl;
-      for(int i = 0; i < params.N; ++i)
-        file << ps[i] << (i == params.N-1 ? "\n" : "\t");
-      file << "path for C" << std::endl;
-      for(int i = 0; i < params.N; ++i)
-        file << pc[i] << (i == params.N-1 ? "\n" : "\t");
-      file << "sigma " << sigma << std::endl;
-      // note than B and D might not be up-to-date
-      file << "covariance matrix" << std::endl;
-      writeToStream(WKC, file);
-    }
-    if(key & WKXMean)
-    {
-      for(int i = 0; i < params.N; ++i)
-        file << (i == 0 ? "" : "\t") << xmean[i];
-      file << std::endl;
-    }
-    if(key & WKC)
-    {
-      for(int i = 0; i < params.N; ++i)
-        for(int j = 0; j <= i; ++j)
-        {
-          file << C[i][j];
-          if(j == i)
-            file << std::endl;
-          else
-            file << '\t';
-        }
-      file << std::endl;
-    }
-    if(key & WKAll)
-    {
-      time_t ti = time(0);
-      file << std::endl << "# --------- " << asctime(localtime(&ti)) << std::endl;
-      file << " N " << params.N << std::endl;
-      file << "function evaluations " << (long) countevals << std::endl;
-      file << "elapsed (CPU) time [s] " << std::setprecision(2) << eigenTimings.totaltotaltime << std::endl;
-      file << "function value f(x)=" << population[index[0]][params.N] << std::endl;
-      file << "maximal standard deviation " << sigma*std::sqrt(maxdiagC) << std::endl;
-      file << "minimal standard deviation " << sigma*std::sqrt(mindiagC) << std::endl;
-      file << "sigma " << sigma << std::endl;
-      file << "axisratio " << (maxElement(rgD, params.N) / minElement(rgD, params.N)) << std::endl;
-      file << "xbestever found after " << std::setprecision(0) << xBestEver[params.N+1]
-          << "evaluations, function value " << xBestEver[params.N] << std::endl;
-      for(int i = 0; i < params.N; ++i)
-        file << " " << std::setw(12) << xBestEver[i] << (i % 5 == 4 || i == params.N-1 ? '\n' : ' ');
-      file << "xbest (of last generation, function value " << population[index[0]][params.N] << ")" << std::endl;
-      for(int i = 0; i < params.N; ++i)
-        file << " " << std::setw(12) << population[index[0]][i] << (i % 5 == 4 || i == params.N-1 ? '\n' : ' ');
-      file << "xmean" << std::endl;
-      for(int i = 0; i < params.N; ++i)
-        file << " " << std::setw(12) << xmean[i] << (i % 5 == 4 || i == params.N-1 ? '\n' : ' ');
-      file << "Standard deviation of coordinate axes (sigma*sqrt(diag(C)))" << std::endl;
-      for(int i = 0; i < params.N; ++i)
-        file << " " << std::setw(12) << sigma*std::sqrt(C[i][i]) << (i % 5 == 4 || i == params.N-1 ? '\n' : ' ');
-      file << "Main axis lengths of mutation ellipsoid (sigma*diag(D))" << std::endl;
-      for(int i = 0; i < params.N; ++i)
-          tempRandom[i] = rgD[i];
-      std::sort(tempRandom, tempRandom + params.N);
-      for(int i = 0; i < params.N; ++i)
-        file << " " << std::setw(12) << sigma*tempRandom[params.N-1-i] << (i % 5 == 4 || i == params.N-1 ? '\n' : ' ');
-      file << "Longest axis (b_i where d_ii=max(diag(D))" << std::endl;
-      int k = maxIndex(rgD, params.N);
-      for(int i = 0; i < params.N; ++i)
-        file << " " << std::setw(12) << B[i][k] << (i % 5 == 4 || i == params.N-1 ? '\n' : ' ');
-      file << "Shortest axis (b_i where d_ii=max(diag(D))" << std::endl;
-      k = minIndex(rgD, params.N);
-      for(int i = 0; i < params.N; ++i)
-        file << " " << std::setw(12) << B[i][k] << (i % 5 == 4 || i == params.N-1 ? '\n' : ' ');
-      file << std::endl;
-    }
-    if(key & WKFewInfo)
-    {
-      file << " Iter\tFevals\tFunction Value\tSigma\tMaxCoorDev\tMinCoorDev\t"
-          << "AxisRatio\tMinDii\tTime in eig" << std::endl;
-      file << std::endl;
-    }
-    if(key & WKFew)
-    {
-      file << (int) gen << "\t" << (int) countevals << "\t"
-          << functionValues[index[0]] << "\t\t" << sigma << "  "
-          << sigma*std::sqrt(maxdiagC) << "\t" << sigma*std::sqrt(mindiagC)
-          << "\t" << std::scientific << std::setprecision(2)
-          << std::sqrt(maxEW / minEW) << "\t" << std::sqrt(minEW)
-          << "  " << eigenTimings.totaltotaltime;
-      file << std::endl;
-    }
-    if(key & WKEval)
-    {
-      file << countevals;
-      file << std::endl;
-    }
-    if(key & WKFitness)
-    {
-      for(int i = 0; i < params.N; ++i)
-        file << (i == 0 ? "" : "\t") << functionValues[index[i]];
-      file << std::endl;
-    }
-    if(key & WKFBestEver)
-    {
-      file << xBestEver[params.N] << std::endl;
-    }
-    if(key & WKCGeneration)
-    {
-      file << gen << std::endl;
-    }
-    if(key & WKSigma)
-    {
-      file << sigma << std::endl;
-    }
-    if(key & WKLambda)
-    {
-      file << params.lambda << std::endl;
-    }
-    if(key & WKB)
-    {
-      int* iindex = new int[params.N];
-      sortIndex(rgD, iindex, params.N);
-      for(int i = 0; i < params.N; ++i)
-        for(int j = 0; j < params.N; ++j)
-        {
-          file << B[j][iindex[params.N-1-i]];
-          if(j != params.N-1)
-            file << '\t';
-          else
-            file << std::endl;
-        }
-      delete[] iindex;
-      iindex = 0;
-      file << std::endl;
-    }
-    if(key & WKXBest)
-    {
-      for(int i = 0; i < params.N; ++i)
-        file << (i == 0 ? "" : "\t") << population[index[0]][i];
-      file << std::endl;
-    }
-    if(key & WKClock)
-    {
-      eigenTimings.update();
-      file << eigenTimings.totaltotaltime << " " << eigenTimings.tictoctime
-          << std::endl;
-    }
-    if(key & WKDim)
-    {
-      file << params.N;
-      file << std::endl;
-    }
-  }
-
 public:
 
-  T countevals; //!< objective function evaluations
-  Timing eigenTimings;
+  T countevals;
 
   CMAES()
-    : version("1.0alpha")
   {
   }
 
@@ -790,19 +601,17 @@ public:
     eigensysIsUptodate = true;
     doCheckEigen = false;
     genOfEigensysUpdate = 0;
-    isResumeDone = false;
 
     T dtest;
     for(dtest = T(1); dtest && dtest < T(1.1)*dtest; dtest *= T(2))
       if(dtest == dtest + T(1))
         break;
-    dMaxSignifKond = dtest / T(1000); // not sure whether this is really save, 100 does not work well enough
+    dMaxSignifKond = dtest / T(1000); // not sure whether this is really safe, 100 does not work well enough
 
     gen = 0;
     countevals = 0;
     state = INITIALIZED;
     dLastMinEWgroesserNull = T(1);
-    printtime = writetime = firstwritetime = firstprinttime = 0;
 
     pc = new T[params.N];
     ps = new T[params.N];
@@ -888,167 +697,9 @@ public:
       for(int i = 0; i < params.N; ++i)
         xmean[i] += sigma*rgD[i]*rand.gauss();
 
-    if(params.resumefile != "")
-      resumeDistribution(params.resumefile);
-
     return publicFitness;
   }
 
-  /**
-   * Well, says hello.
-   * @return eg. "(5,10)-CMA-ES(mu_eff=3.4), Ver="1.0alpha", dimension=9"
-   */
-  std::string sayHello()
-  {
-    std::stringstream stream;
-    stream << "(" << params.mu << "," << params.lambda << ")-CMA-ES(mu_eff="
-        << std::setprecision(1) << params.mueff << "), Ver=\"" << version
-        << "\", dimension=" << params.N << ", diagonalIterations="
-        << (long) params.diagonalCov << " (" << getTimeStr() << ")";
-    return stream.str();
-  }
-
-  /**
-   * Allows to restart with saved internal state (distribution) variables (use
-   * writeToFile() for saving). Keyword "resume" followed by a filename in
-   * initials.par invokes this function during initialization. Searches in
-   * filename for the last occurrence of word "resume", followed by a dimension
-   * number, and reads the subsequent values for xmean, evolution paths ps and
-   * pc, sigma and covariance matrix.  Note that init() needs to be called
-   * before calling resume_distribution() explicitely.  In the former all the
-   * remaining (strategy-)parameters are set. It can be useful to edit the
-   * written parameters, in particular to increase sigma, before resume.
-   *
-   * Not all internal state parameters are recovered. In particular generation
-   * number and xbestever are not restored. For covariance matrices with large
-   * condition numbers the writing precision of 6 digits is not sufficient and
-   * resume will lead to poor result.
-   * @param filename A file, that was written presumably by writeToFile().
-   */
-  void resumeDistribution(const std::string& filename)
-  {
-    std::ifstream file(filename.c_str());
-    if(!file.is_open())
-      throw std::runtime_error("resumeDistribution(): could not open '" + filename + "'");
-
-    std::streampos lastResume = 0;
-    std::string entry = "";
-    while(!file.eof())
-    {
-      file >> entry;
-      if(entry == "resume")
-      {
-        lastResume = file.tellg();
-        break;
-      }
-    }
-    file.clear();
-    file.seekg(lastResume);
-
-    int n = 0;
-    file >> n;
-    if(n != params.N)
-      throw std::runtime_error("resumeDistribution(): Dimension numbers do not match");
-
-    // find next "xmean" entry
-    while(!file.eof())
-    {
-      file >> entry;
-      if(entry == "xmean")
-        break;
-    }
-    // read xmean
-    if(file.eof())
-      throw std::runtime_error("resumeDistribution(): 'xmean' not found");
-    for(int i = 0; i < n; i++)
-      file >> xmean[i];
-    file.clear();
-    file.seekg(lastResume);
-
-    // find next "path for sigma" entry
-    while(!file.eof())
-    {
-      file >> entry;
-      if(entry == "path")
-      {
-        std::string temp = "";
-        file >> temp;
-        entry += " " + temp;
-        file >> temp;
-        entry += " " + temp;
-        if(entry == "path for sigma")
-          break;
-      }
-    }
-    // read ps
-    if(file.eof())
-      throw std::runtime_error("resumeDistribution(): 'path for sigma' not found");
-    for(int i = 0; i < n; i++)
-      file >> ps[i];
-    file.clear();
-    file.seekg(lastResume);
-
-    // find next "path for C" entry
-    while(!file.eof())
-    {
-      file >> entry;
-      if(entry == "path")
-      {
-        std::string temp = "";
-        file >> temp;
-        entry += " " + temp;
-        file >> temp;
-        entry += " " + temp;
-        if(entry == "path for C")
-          break;
-      }
-    }
-    // read pc
-    if(file.eof())
-      throw std::runtime_error("resumeDistribution(): 'path for C' not found");
-    for(int i = 0; i < n; i++)
-      file >> pc[i];
-    file.clear();
-    file.seekg(lastResume);
-
-    // find next "sigma" entry
-    while(!file.eof())
-    {
-      file >> entry;
-      if(entry == "sigma")
-        break;
-    }
-    // read pc
-    if(file.eof())
-      throw std::runtime_error("resumeDistribution(): 'sigma' not found");
-    file >> sigma;
-    file.clear();
-    file.seekg(lastResume);
-
-    // find next "covariance matrix" entry
-    while(!file.eof())
-    {
-      file >> entry;
-      if(entry == "covariance")
-      {
-        std::string temp = "";
-        file >> temp;
-        entry += " " + temp;
-        if(entry == "covariance matrix")
-          break;
-      }
-    }
-    // read C
-    if(file.eof())
-      throw std::runtime_error("resumeDistribution(): 'covariance matrix' not found");
-    for(int i = 0; i < params.N; ++i)
-      for(int j = 0; j <= i; ++j)
-        file >> C[i][j];
-
-    eigensysIsUptodate = false;
-    isResumeDone = true;
-    updateEigensystem(true);
-  }
 
   /**
    * The search space vectors have a special form: they are arrays with N+1
@@ -1072,7 +723,7 @@ public:
         minEW = square(minElement(rgD, params.N));
         maxEW = square(maxElement(rgD, params.N));
         eigensysIsUptodate = true;
-        eigenTimings.start();
+
       }
     }
 
@@ -1107,9 +758,7 @@ public:
    * Can be called after samplePopulation() to resample single solutions of the
    * population as often as desired. Useful to implement a box constraints
    * (boundary) handling.
-   * @param i Index to an element of the returned value of samplePopulation().
-   *          population[index] will be resampled where \f$0\leq i<\lambda\f$
-   *          must hold.
+   * @param i Index to an element of the returned value of samplePopulation()
    * @return A pointer to the resampled "population".
    */
   T* const* reSampleSingle(int i)
@@ -1167,9 +816,8 @@ public:
    * @param x Solution vector that gets sampled a new value. If x == NULL new
    *          memory is allocated and must be released by the user using
    *          delete[] x.
-   * @param pxmean Mean vector \f$\mu\f$ for perturbation.
-   * @param eps Scale factor \f$\epsilon\f$ for perturbation:
-   *            \f$x \sim \mu + \epsilon \sigma N(0,C)\f$.
+   * @param pxmean Mean vector for perturbation.
+   * @param eps Scale factor for perturbation:
    * @return A pointer to the perturbed solution vector, equals input x for
    *         x != NULL.
    */
@@ -1186,7 +834,7 @@ public:
    * Core procedure of the CMA-ES algorithm. Sets a new mean value and estimates
    * the new covariance matrix and a new step size for the normal search
    * distribution.
-   * @param fitnessValues An array of \f$\lambda\f$ function values.
+   * @param fitnessValues An array of lambda function values.
    * @return Mean value of the new distribution.
    */
   T* updateDistribution(const T* fitnessValues)
@@ -1304,121 +952,7 @@ public:
     return xmean;
   }
 
-  /**
-   * Request a scalar parameter from CMA-ES.
-   * @param key Key of the requested scalar.
-   * @return The desired value.
-   */
-  T get(GetScalar key)
-  {
-    switch(key)
-    {
-      case AxisRatio:
-        return maxElement(rgD, params.N) / minElement(rgD, params.N);
-      case Eval:
-        return countevals;
-      case Fitness:
-        return functionValues[index[0]];
-      case FBestEver:
-        return xBestEver[params.N];
-      case Generation:
-        return gen;
-      case MaxEval:
-        return params.stopMaxFunEvals;
-      case MaxIter:
-        return std::ceil(params.stopMaxIter);
-      case MaxAxisLength:
-        return sigma*std::sqrt(maxEW);
-      case MinAxisLength:
-        return sigma*std::sqrt(minEW);
-      case MaxStdDev:
-        return sigma*std::sqrt(maxdiagC);
-      case MinStdDev:
-        return sigma*std::sqrt(mindiagC);
-      case Dimension:
-        return params.N;
-      case SampleSize:
-        return params.lambda;
-      case Sigma:
-        return sigma;
-      default:
-        throw std::runtime_error("get(): No match found for key");
-    }
-  }
 
-  /**
-   * Request a vector parameter from CMA-ES.
-   * @param key Key of the requested vector.
-   * @return Pointer to the desired value array. Its content might be
-   *         overwritten during the next call to any member functions other
-   *         than get().
-   */
-  const T* getPtr(GetVector key)
-  {
-    switch(key)
-    {
-      case DiagC:
-      {
-        for(int i = 0; i < params.N; ++i)
-          output[i] = C[i][i];
-        return output;
-      }
-      case DiagD:
-        return rgD;
-      case StdDev:
-      {
-        for(int i = 0; i < params.N; ++i)
-          output[i] = sigma*std::sqrt(C[i][i]);
-        return output;
-      }
-      case XBestEver:
-        return xBestEver;
-      case XBest:
-        return population[index[0]];
-      case XMean:
-        return xmean;
-      default:
-        throw std::runtime_error("getPtr(): No match found for key");
-    }
-  }
-
-  /**
-   * Request a vector parameter from CMA-ES.
-   * @param key Key of the requested vector.
-   * @return Pointer to the desired value array with unlimited reading and
-   *         writing access to its elements. The memory must be explicitly
-   *         released using delete[].
-   */
-  T* getNew(GetVector key)
-  {
-    return getInto(key, 0);
-  }
-
-  /**
-   * Request a vector parameter from CMA-ES.
-   * @param key Key of the requested vector.
-   * @param res Memory of size N == dimension, where the desired values are
-   *            written into. For mem == NULL new memory is allocated as with
-   *            calling getNew() and must be released by the user at some point.
-   */
-  T* getInto(GetVector key, T* res)
-  {
-    T const* res0 = getPtr(key);
-    if(!res)
-      res = new T[params.N];
-    for(int i = 0; i < params.N; ++i)
-      res[i] = res0[i];
-    return res;
-  }
-
-  /**
-   * Some stopping criteria can be set in initials.par, with names starting
-   * with stop... Internal stopping criteria include a maximal condition number
-   * of about 10^15 for the covariance matrix and situations where the numerical
-   * discretisation error in x-space becomes noticeably. You can get a message
-   * that contains the matched stop criteria via getStopMessage().
-   * @return Does any stop criterion match?
-   */
   bool testForTermination()
   {
     T range, fac;
@@ -1549,38 +1083,8 @@ public:
     return stopMessage;
   }
 
-  /**
-   * @param filename Output file name.
-   * @param key Key of type WriteKey that indicates the content that should be
-   *            written. You can combine multiple keys with |.
-   */
-  void writeToFile(int key, const std::string& filename)
-  {
-    std::ofstream file;
-    file.open(filename.c_str(), std::ios_base::app);
-
-    if(file.is_open())
-    {
-      if(gen > 0 || filename.substr(0, 11) != "outcmaesfit")
-        writeToStream(key, file); /* do not write fitness for gen==0 */
-      file.close();
-    }
-    else
-    {
-      throw std::runtime_error("writeToFile(): could not open '" + filename + "'");
-    }
-  }
-
-  /**
-   * Conducts the eigendecomposition of C into B and D such that
-   * \f$C = B \cdot D \cdot D \cdot B^T\f$ and \f$B \cdot B^T = I\f$
-   * and D diagonal and positive.
-   * @param force For force == true the eigendecomposion is conducted even if
-   *              eigenvector and values seem to be up to date.
-   */
   void updateEigensystem(bool force)
   {
-    eigenTimings.update();
 
     if(!force)
     {
@@ -1589,16 +1093,10 @@ public:
       // return on modulo generation number
       if(gen < genOfEigensysUpdate + params.updateCmode.modulo)
         return;
-      // return on time percentage
-      if(params.updateCmode.maxtime < 1.00
-          && eigenTimings.tictoctime > params.updateCmode.maxtime* eigenTimings.totaltime
-          && eigenTimings.tictoctime > 0.0002)
-        return;
+
     }
 
-    eigenTimings.tic();
     eigen(rgD, B, tempRandom);
-    eigenTimings.toc();
 
     // find largest and smallest eigenvalue, they are supposed to be sorted anyway
     minEW = minElement(rgD, params.N);
@@ -1634,3 +1132,9 @@ public:
     return newxmean;
   }
 };
+
+
+}  // namespace neuro_cmaes
+}  // namespace mlpack
+
+#endif  // MLPACK_METHODS_NEURO_CMAES_NEURO_CMAES_HPP

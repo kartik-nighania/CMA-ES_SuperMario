@@ -2,29 +2,43 @@
  * @file super_mario_bros.cpp
  * @author Marcus Edel
  *
- * Using CMA_ES algorithm 
+ * Simple test programm to use the mlpack evolution methods.
  */
+
+#include <mlpack/core.hpp>
+
 #include <iostream>
 #include <string>
 #include <stdlib.h>
-
-#include <mlpack/core.hpp> 
-#include "link_gene.hpp"
-#include "neuron_gene.hpp"
-#include "genome.hpp"
-#include "utils.hpp"
-
-
-#include "cmaes.h"
 
 #include "parser.hpp"
 #include "client.hpp"
 #include "messages.hpp"
 
 
+#include "link_gene.hpp"
+#include "neuro_cmaes.hpp"
+#include "neuron_gene.hpp"
+#include "genome.hpp"
+#include "parameters.hpp"
+#include "utils.hpp"
+#include "random.hpp" 
+
+
+/* #include <mlpack/methods/neuro_cmaes/neuro_cmaes.hpp>
+#include <mlpack/methods/neuro_cmaes/random.hpp>
+#include <mlpack/methods/neuro_cmaes/link_gene.hpp>
+#include <mlpack/methods/neuro_cmaes/neuron_gene.hpp>
+#include <mlpack/methods/neuro_cmaes/genome.hpp>
+#include <mlpack/methods/neuro_cmaes/parameters.hpp>
+#include <mlpack/methods/neuro_cmaes/utils.hpp>
+*/
+
+
+
 
 using namespace mlpack;
-using namespace bang::ne;
+using namespace mlpack::neuro_cmaes;
 
 class TaskSuperMarioBros
 {
@@ -308,9 +322,14 @@ class TaskSuperMarioBros
   int playerState;
 
   //! Locally stored success indicator; set to true if task solved.
-  bool success;
+  bool success = false;
 };
 
+
+void setWeights(std::vector<LinkGene>& links, double const *x, int N)
+{
+     for(int i=0; i < N; i++) links[i].Weight(x[i]);
+}
 
 int main(int argc, char* argv[])
 {
@@ -321,27 +340,28 @@ int main(int argc, char* argv[])
 
   TaskSuperMarioBros task(host, port);
 
-  // Set parameters of NEAT algorithm.
-  Parameters params;
-  params.aPopulationSize = 300;
-  params.aMaxGeneration = 50000;
-  params.aCoeffDisjoint = 2.0;
-  params.aCoeffWeightDiff = 0.5;
-  params.aCompatThreshold = 0.35;
-  params.aStaleAgeThreshold = 15;
-  params.aCrossoverRate = 0.75;
-  params.aCullSpeciesPercentage = 0.8;
-  params.aMutateWeightProb = 0.2;
-  params.aPerturbWeightProb = 0.9;
-  params.aMutateWeightSize = 0.1;
-  params.aMutateAddForwardLinkProb = 2.0;
-  params.aMutateAddBackwardLinkProb = 0;
-  params.aMutateAddRecurrentLinkProb = 0;
-  params.aMutateAddBiasLinkProb = 0.3;
-  params.aMutateAddNeuronProb = 0.5;
-  params.aMutateEnabledProb = 0.3;
-  params.aMutateDisabledProb = 0.2;
-  params.aNumSpeciesThreshold = 10;
+  CMAES<double> evo;
+  Parameters<double> params;
+
+  params.stopMaxFunEvals= 50000;
+  params.stopMaxIter= 10000;
+  params.stStopFitness.flg = true;
+  params.stStopFitness.val = 1/3266;
+  params.logWarnings = true;
+  params.lambda = 10;
+
+   const int dim = 170*6 + 6*5;
+
+  double xstart[dim];
+  for(int i=0; i<dim; i++) xstart[i] = 0.5;
+
+  double stddev[dim];
+  for(int i=0; i<dim; i++) stddev[i] = 0.3;
+
+   params.init(dim, xstart, stddev);
+
+   double *arFunvals , *const*pop ;
+   arFunvals = evo.init(params);
 
   // Set seed genome for the Super Mario Bros. task.
   ssize_t numInput = 170;
@@ -373,38 +393,64 @@ int main(int argc, char* argv[])
   NeuronGene outputGene5(174, OUTPUT, SIGMOID, 1, 0, 0);
   neuronGenes.push_back(outputGene5);
 
-  // Create a single hidden node.
-  NeuronGene hiddenGene(175, HIDDEN, SIGMOID, 0.5, 0, 0);
-  neuronGenes.push_back(hiddenGene);
+  NeuronGene hiddenGene1(175, HIDDEN, SIGMOID, 0.5, 0, 0);
+  neuronGenes.push_back(hiddenGene1);
+  NeuronGene hiddenGene2(176, HIDDEN, SIGMOID, 0.5, 0, 0);
+  neuronGenes.push_back(hiddenGene2);
+  NeuronGene hiddenGene3(177, HIDDEN, SIGMOID, 0.5, 0, 0);
+  neuronGenes.push_back(hiddenGene3);
+  NeuronGene hiddenGene4(178, HIDDEN, SIGMOID, 0.5, 0, 0);
+  neuronGenes.push_back(hiddenGene4);
+  NeuronGene hiddenGene5(179, HIDDEN, SIGMOID, 0.5, 0, 0);
+  neuronGenes.push_back(hiddenGene5);
+  NeuronGene hiddenGene6(180, HIDDEN, SIGMOID, 0.5, 0, 0);
+  neuronGenes.push_back(hiddenGene6);
 
-  // Connect all input and  bias nodes with the single hidden node.
-  for (size_t i = 0; i < 170; ++i)
+  //connecting input to hidden nodes
+  for(size_t j = 175 ; j <181 ; j++ )
   {
-    LinkGene link(i, 175, i, 0, true);
-    linkGenes.push_back(link);
+	  	for (size_t i = 0; i < 170; ++i)
+	  {
+	    LinkGene link(i,j,0);
+	    linkGenes.push_back(link);
+	  }
   }
 
-  // Connect the single hidden node with all output nodes.
-  LinkGene link1(175, 170, 170, 0, true);
-  linkGenes.push_back(link1);
-  LinkGene link2(175, 171, 171, 0, true);
-  linkGenes.push_back(link2);
-  LinkGene link3(175, 172, 172, 0, true);
-  linkGenes.push_back(link3);
-  LinkGene link4(175, 173, 173, 0, true);
-  linkGenes.push_back(link4);
-  LinkGene link5(175, 174, 174, 0, true);
-  linkGenes.push_back(link5);
+  // connecting hidden to output nodes
+   for(size_t j=175; j<181; j++)
+   {
+   	for (size_t i = 170; i < 175; ++i)
+	  {
+	     LinkGene link1(j, i, 0);
+         linkGenes.push_back(link1);
+	  }
+   }
+
+
 
   // Instantiate initial seed genome.
-  Genome seedGenome = Genome(0, neuronGenes, linkGenes, numInput, numOutput,
-      fitness);
+  Genome neuralNet = Genome(neuronGenes, linkGenes, numInput, numOutput);
+  neuralNet.SortLinkGenes();
 
-  // Construct NEAT instance.
-  NEAT<TaskSuperMarioBros> neat(task, seedGenome, params);
+ while(!evo.testForTermination() && !task.Success())
+  {
+    // Generate lambda new search points, sample population
+    pop = evo.samplePopulation();
 
-  // Evolve network.
-  neat.Evolve();
+    // evaluate the new search points using fitness function from above
+    for (int i = 0; i < evo.sampleSize(); ++i)
+	{
+		//wights and flush
+		 neuralNet.Flush();
+
+		 setWeights(linkGenes, pop[i], (int) evo.dimension());
+
+		 arFunvals[i] = task.EvalFitness(neuralNet);
+
+    }
+    // update the search distribution used for sampleDistribution()
+    evo.updateDistribution(arFunvals);
+  }
 
   return 0;
 }

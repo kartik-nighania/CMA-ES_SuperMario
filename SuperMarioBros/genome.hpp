@@ -1,11 +1,5 @@
-/**
- * @file genome.hpp
- * @author Bang Liu
- *
- * Definition of the Genome class.
- */
-#ifndef MLPACK_METHODS_NE_GENOME_HPP
-#define MLPACK_METHODS_NE_GENOME_HPP
+#ifndef MLPACK_METHODS_NEURO_CMAES_GENOME_HPP
+#define MLPACK_METHODS_NEURO_CMAES_GENOME_HPP
 
 #include <cstddef>
 #include <cassert>
@@ -17,12 +11,12 @@
 #include "neuron_gene.hpp"
 #include "utils.hpp"
 
-namespace bang {
-namespace ne {
+namespace mlpack {
+namespace neuro_cmaes {
 
 /**
  * This class defines a genome.
- # A genome is consist of a group of genes.
+ # A genome which uses neurons and links class to make its structure.
  */
 class Genome {
  public:
@@ -33,36 +27,31 @@ class Genome {
   std::vector<LinkGene> aLinkGenes;
 
   // Default constructor.
-  Genome() {
-    aId = -1;
+  Genome()
+   {
     aNumInput = 0;
     aNumOutput = 0;
-    aFitness = DBL_MAX;
-  }
+   }
   
   // Parametric constructor.
-  Genome(ssize_t id,
-  	     const std::vector<NeuronGene>& neuronGenes,
+  Genome(const std::vector<NeuronGene>& neuronGenes,
          const std::vector<LinkGene>& linkGenes,
          ssize_t numInput,
-         ssize_t numOutput,
-         double fitness):
-    aId(id),
+         ssize_t numOutput):
+         
     aNeuronGenes(neuronGenes),
     aLinkGenes(linkGenes),
     aNumInput(numInput),
-    aNumOutput(numOutput),
-    aFitness(fitness)
+    aNumOutput(numOutput)
   {}
 
   // Copy constructor.
-  Genome(const Genome& genome) {
-    aId = genome.aId;
+  Genome(const Genome& genome) 
+  {
     aNeuronGenes = genome.aNeuronGenes;
     aLinkGenes = genome.aLinkGenes;
     aNumInput = genome.aNumInput;
     aNumOutput = genome.aNumOutput;
-    aFitness = genome.aFitness;
   }
 
   // Destructor.
@@ -70,23 +59,16 @@ class Genome {
 
   // Operator =.
   Genome& operator =(const Genome& genome) {
-    if (this != &genome) {
-      aId = genome.aId;
+    if (this != &genome) 
+    {
       aNeuronGenes = genome.aNeuronGenes;
       aLinkGenes = genome.aLinkGenes;
       aNumInput = genome.aNumInput;
       aNumOutput = genome.aNumOutput;
-      aFitness = genome.aFitness;
     }
 
     return *this;
   }
-
-  // Get genome id.
-  ssize_t Id() const { return aId; }
-
-  // Set genome id.
-  void Id(ssize_t id) { aId = id; }
 
   // Get input length.
   ssize_t NumInput() { return aNumInput; }
@@ -99,12 +81,6 @@ class Genome {
 
   // Set output length.
   void NumOutput(ssize_t numOutput) { aNumOutput = numOutput; }
-
-  // Set fitness.
-  void Fitness(double fitness) { aFitness = fitness; }
-
-  // Get fitness.
-  double Fitness() const { return aFitness; }
 
   // Get neuron number.
   ssize_t NumNeuron() const {
@@ -170,47 +146,16 @@ class Genome {
     return -1;  // Id start from 0.
   }
 
-  // Get link index by innovation id.
-  ssize_t GetLinkIndex(ssize_t innovId) const {
-    for(ssize_t i=0; i < NumLink(); ++i) {
-        if (aLinkGenes[i].InnovationId() == innovId) {
-            return i;
-        }
-    }
-
-    return -1;  // Id start from 0.
-  }
-
-  // Whether link exist and enabled.
-  bool ContainEnabledLink(ssize_t innovId) const {
-    for(ssize_t i=0; i < NumLink(); ++i) {
-        if (aLinkGenes[i].InnovationId() == innovId &&
-            aLinkGenes[i].Enabled()) {
-            return true;
-        }
-    }
-    return false;
-  }
-
-  // Whether link exist.
-  bool ContainLink(ssize_t innovId) const {
-    for(ssize_t i=0; i < NumLink(); ++i) {
-        if (aLinkGenes[i].InnovationId() == innovId) {
-            return true;
-        }
-    }
-    return false;
-  }
-
-  // Set neurons' input and output to zero.
-  void Flush() {
-    for (ssize_t i=0; i<aNeuronGenes.size(); ++i) {
+   void Flush() 
+   {
+    for (ssize_t i=0; i<aNeuronGenes.size(); ++i)
+     {
       aNeuronGenes[i].Activation(0);
       aNeuronGenes[i].Input(0);
-    }
-  }
+     }
+   }
 
-  // Sort link genes by toNeuron's depth.
+   // Sort link genes by toNeuron's depth.
   void SortLinkGenes() {
     struct DepthAndLink
     {
@@ -245,11 +190,10 @@ class Genome {
     }
   }
 
+
   // Activate genome. The last dimension of input is always 1 for bias. 0 means no bias.
   void Activate(std::vector<double>& input) {
     assert(input.size() == aNumInput);
-
-    SortLinkGenes();
     
     // Set all neurons' input to be 0.
     for (ssize_t i=0; i<NumNeuron(); ++i) {
@@ -263,20 +207,24 @@ class Genome {
     }
 
     // Activate hidden and output neurons.
-    for (ssize_t i = 0; i < NumLink(); ++i) {
-      if (aLinkGenes[i].Enabled()) {
+    for (ssize_t i = 0; i < NumLink(); ++i) 
+    {
+     
         ssize_t toNeuronIdx = GetNeuronIndex(aLinkGenes[i].ToNeuronId());
         ssize_t fromNeuronIdx = GetNeuronIndex(aLinkGenes[i].FromNeuronId());
         double input = aNeuronGenes[toNeuronIdx].Input() + 
                        aNeuronGenes[fromNeuronIdx].Activation() * aLinkGenes[i].Weight();
         aNeuronGenes[toNeuronIdx].Input(input);
         
-        if (i == NumLink() - 1) {
-          aNeuronGenes[toNeuronIdx].CalcActivation();
-        } else if (GetNeuronIndex(aLinkGenes[i + 1].ToNeuronId()) != toNeuronIdx) {
+        if (i == NumLink() - 1) 
+        {
           aNeuronGenes[toNeuronIdx].CalcActivation();
         }
-      }
+         else if (GetNeuronIndex(aLinkGenes[i + 1].ToNeuronId()) != toNeuronIdx) 
+        {
+          aNeuronGenes[toNeuronIdx].CalcActivation();
+        }
+      
     }
   }
 
@@ -288,47 +236,17 @@ class Genome {
     }
   }
 
-  // Set random link weights between [lo, hi].
-  void RandomizeWeights(const double lo, const double hi) {
-    for (ssize_t i=0; i<aLinkGenes.size(); ++i) {
-      double weight = mlpack::math::Random(lo, hi);
-      aLinkGenes[i].Weight(weight); 
-    }
-  }
-
-  // Add link.
-  void AddLink(LinkGene& linkGene) {
-    aLinkGenes.push_back(linkGene);
-  }
-
-  // Add neuron.
-  void AddHiddenNeuron(NeuronGene& neuronGene) {
-    if (neuronGene.Type() == HIDDEN) {
-      aNeuronGenes.push_back(neuronGene);
-    }
-  }
-
-  // Show genome structure.
-  void Show() {
-    
-  }
 
  private:
-  // Genome id.
-  ssize_t aId;
-
   // Input length (include bias). 
   ssize_t aNumInput;
 
   // Output length.
   ssize_t aNumOutput;
 
-  // Genome fitness.
-  double aFitness;
-
 };
 
-}  // namespace ne
-}  // namespace bang
+}  // namespace neuro_cmaes
+}  // namespace mlpack
 
-#endif  // MLPACK_METHODS_NE_GENOME_HPP
+#endif  // MLPACK_METHODS_NEURO_CMAES_GENOME_HPP

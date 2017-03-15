@@ -1,11 +1,5 @@
-/**
- * @file neuron_gene.hpp
- * @author Bang Liu
- *
- * Definition of the NeuronGene class.
- */
-#ifndef MLPACK_METHODS_NE_NEURON_GENE_HPP
-#define MLPACK_METHODS_NE_NEURON_GENE_HPP
+#ifndef MLPACK_METHODS_NEURO_CMAES_NEURON_GENE_HPP
+#define MLPACK_METHODS_NEURO_CMAES_NEURON_GENE_HPP
 
 #include <cstddef>
 
@@ -14,13 +8,14 @@
 #include <mlpack/methods/ann/activation_functions/rectifier_function.hpp>
 #include <mlpack/methods/ann/activation_functions/tanh_function.hpp>
 
-namespace bang {
-namespace ne {
+namespace mlpack {
+namespace neuro_cmaes {
 
 /**
  * This is enumeration of neuron types.
  */
-enum NeuronType {
+enum NeuronType
+ {
   NONE = 0,
   INPUT,
   BIAS,
@@ -31,7 +26,8 @@ enum NeuronType {
 /**
  * This is enumeration of activation function types.
  */
-enum ActivationFuncType {
+enum ActivationFuncType
+{
     SIGMOID = 0,
     TANH,
     LINEAR,
@@ -47,12 +43,8 @@ class NeuronGene {
   NeuronGene() {}
 
   // Parametric constructor.
-  NeuronGene(ssize_t id,
-  	         NeuronType type,
-  	         ActivationFuncType actFuncType,
-             double depth,
-  	         double input,
-             double activation):
+  NeuronGene(ssize_t id, NeuronType type, ActivationFuncType actFuncType,
+   double depth, double input, double activation):
     aId(id),
     aType(type),
     aActFuncType(actFuncType),
@@ -168,7 +160,7 @@ class NeuronGene {
 
 };
 
-}  // namespace ne
-}  // namespace bang
+}  // namespace neuro_cmaes
+}  // namespace mlpack
 
 #endif  // MLPACK_METHODS_NE_NEURON_GENE_HPP

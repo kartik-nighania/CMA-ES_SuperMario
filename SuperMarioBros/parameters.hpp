@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MLPACK_METHODS_NEURO_CMAES_PARAMETERS_HPP
+#define MLPACK_METHODS_NEURO_CMAES_PARAMETERS_HPP
 
 #include <cmath>
 #include <limits>
@@ -7,6 +8,13 @@
 #include <stdexcept>
 #include <string>
 
+
+namespace mlpack {
+namespace neuro_cmaes {
+/**
+ * @class Parameters
+ * Holds all parameters that can be adjusted by the user.
+ */
 template<typename T> class CMAES;
 
 /**
@@ -96,9 +104,6 @@ public:
     UNINITIALIZED_WEIGHTS, LINEAR_WEIGHTS, EQUAL_WEIGHTS, LOG_WEIGHTS
   } weightMode;
 
-  //! File that contains an optimization state that should be resumed.
-  std::string resumefile;
-
   //! Set to true to activate logging warnings.
   bool logWarnings;
   //! Output stream that is used to log warnings, usually std::cerr.
@@ -129,7 +134,6 @@ public:
         ccov(-1),
         facupdateCmode(1),
         weightMode(UNINITIALIZED_WEIGHTS),
-        resumefile(""),
         logWarnings(false),
         logStream(std::cerr)
   {
@@ -321,8 +325,6 @@ private:
     facupdateCmode = p.facupdateCmode;
 
     weightMode = p.weightMode;
-
-    resumefile = p.resumefile;
   }
 
   /**
@@ -420,3 +422,8 @@ private:
   }
 };
 
+
+}  // namespace neuro_cmaes
+}  // namespace mlpack
+
+#endif  // MLPACK_METHODS_NEURO_CMAES_PARAMETERS_HPP
